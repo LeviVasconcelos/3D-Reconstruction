@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 2.8.3)
+set(PROJECT_NAME_STR 3d_fail)
+project(${PROJECT_NAME_STR} C CXX)
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions(-Wall -ansi -Wno-deprecated -pthread -std=c++14)
+endif()
+find_package(OpenCV REQUIRED)
+#set(OpenCV_FOUND "1")
+#set(OpenCV_INCLUDE_DIRS "/usr/local/include/opencv")
+#set(OpenCV_LIBS "opencv_calib3d;opencv_core;opencv_dnn;opencv_features2d;opencv_flann;opencv_highgui;opencv_imgcodecs;opencv_imgproc;opencv_ml;opencv_objdetect;opencv_photo;opencv_shape;opencv_stitching;opencv_superres;opencv_video;opencv_videoio;opencv_videostab")
+include_directories(${OpenCV_INCLUDE_DIR})
+find_package(Boost REQUIRED COMPONENTS filesystem)
+include_directories(
+  include
+  ${Boost_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS})
+add_subdirectory(io)
+add_subdirectory(feature_tracker)
+add_subdirectory(image_drivers)
+add_subdirectory(tests)
+FILE(GLOB_RECURSE  LIB_HEADERS include/*.h)
+add_custom_target(headers SOURCES ${LIB_HEADERS})
