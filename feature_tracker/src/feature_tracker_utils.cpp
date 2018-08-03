@@ -12,7 +12,7 @@ constexpr int kBlockSize = 5;
 constexpr int kSobelSize = 3;
 constexpr double kHarrisThreshold = 0.05;
 
-constexpr int kMaxCorners = 100;
+constexpr int kMaxCorners = 300;
 constexpr double kQualityLevel = 0.01;
 constexpr double kMinDist = 15;
 constexpr bool kUseHarris = true;

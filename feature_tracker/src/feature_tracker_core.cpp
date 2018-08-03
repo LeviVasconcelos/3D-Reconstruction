@@ -43,14 +43,20 @@ void FeatureTracker::Track(const cv::Mat &next_frame) {
       float scaled_x = point_feature.x / pow(2., i);
       float scaled_y = point_feature.y / pow(2., i);
 
+      cv::Mat src_pos;
+      CropRectSubpix(current_pyramid_[i], window_size, {scaled_x, scaled_y},
+                     src_pos);
+
       // Get image window shifted by delta (computed at previous pyramid level)
       cv::Point2f center{scaled_x + delta[k].x, scaled_y + delta[k].y};
       cv::Mat cropped_deriv_x;
       cv::Mat cropped_deriv_y;
       cv::Mat cropped_deriv_t;
+      cv::Mat target_pos;
       CropRectSubpix(x_derivatives[i], window_size, center, cropped_deriv_x);
       CropRectSubpix(y_derivatives[i], window_size, center, cropped_deriv_y);
-      CropRectSubpix(time_derivatives[i], window_size, center, cropped_deriv_t);
+      CropRectSubpix(next_pyramid[i], window_size, center, target_pos);
+      cv::subtract(src_pos, target_pos, cropped_deriv_t);
 
       // Compute d = inv(G)*b.
       Eigen::Matrix2f G = ComputeG(cropped_deriv_x, cropped_deriv_y);
@@ -91,7 +97,7 @@ void FeatureTracker::ComputePyramidTimeDerivatives(
   time_derivatives.reserve(pyramid_levels_);
   for (size_t i = 0; i < current_pyramid_.size(); ++i) {
     cv::Mat diff;
-    cv::subtract(target[i], current_pyramid_[i], diff, cv::Mat{}, CV_8UC1);
+    cv::subtract(current_pyramid_[i], target[i], diff, cv::Mat{}, CV_8UC1);
     time_derivatives.push_back(diff);
   }
 }
