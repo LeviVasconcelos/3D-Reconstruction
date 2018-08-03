@@ -18,6 +18,7 @@ std::vector<std::string> LoadFilesWithExtension(
       }
     }
   }
+  std::sort(paths.begin(), paths.end(), std::less<std::string>{});
   return paths;
 }
 

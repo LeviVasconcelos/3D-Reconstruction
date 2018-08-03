@@ -5,7 +5,8 @@ project(${PROJECT_NAME_STR} C CXX)
 set(ALL_SRCS
     src/feature_tracker_common.cpp
     src/feature_tracker_core.cpp
-    src/feature_tracker_utils.cpp)
+    src/feature_tracker_utils.cpp
+    src/feature_tracker_visualizer.cpp)
 
 add_library(3df_feature_track_lib ${ALL_SRCS})
 
