@@ -30,6 +30,8 @@ bool MockImageDriver::LoadNextImage() {
   }
 }
 
+size_t MockImageDriver::GetTotalImages() { return images_file_paths.size(); }
+
 cv::Mat &MockImageDriver::GetImage() { return current_image; }
 
 }  // namespace fail_3d

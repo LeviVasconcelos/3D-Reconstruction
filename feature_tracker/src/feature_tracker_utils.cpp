@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Dense>
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/video/tracking.hpp>
@@ -80,14 +81,21 @@ void ComputeXYImageDerivatives(const cv::Mat &src, cv::Mat &x_derivative,
                                cv::Mat &y_derivative) {
   cv::Mat x_deriv;
   cv::Mat y_deriv;
-  cv::Sobel(src, x_deriv, CV_16S, 1, 0, 3);
-  cv::Sobel(src, y_deriv, CV_16S, 0, 1, 3);
-  convertScaleAbs(x_deriv, x_derivative);
-  convertScaleAbs(y_deriv, y_derivative);
+  cv::Mat src_;
+  src.convertTo(src_, CV_32FC1);
+  cv::Sobel(src_, x_derivative, CV_32FC1, 1, 0, 3);
+  cv::Sobel(src_, y_derivative, CV_32FC1, 0, 1, 3);
+  //  std::cout << (int)src.at<uchar>(0, 0) << " " << src_.at<float>(0, 0) << "
+  //  "
+  //            << x_derivative.at<float>(0, 0) << " "
+  //            << y_derivative.at<float>(0, 0) << std::endl;
+
+  // convertScaleAbs(x_deriv, x_derivative);
+  // convertScaleAbs(y_deriv, y_derivative);
 }
 
 void ComputeTimeDerivative(const cv::Mat &t1, const cv::Mat &t2, cv::Mat &out) {
-  out = t2 - t1;
+  cv::subtract(t2, t1, out);
 }
 
 Eigen::Matrix2f ComputeG(const cv::Mat &x_derivative,
@@ -100,8 +108,8 @@ Eigen::Matrix2f ComputeG(const cv::Mat &x_derivative,
   float xy_term = 0;
   for (size_t i = 0; i < x_derivative.rows; ++i) {
     for (size_t j = 0; j < x_derivative.cols; ++j) {
-      const uchar x_el = x_derivative.at<uchar>(i, j);
-      const uchar &y_el = y_derivative.at<uchar>(i, j);
+      const float &x_el = x_derivative.at<float>(i, j);
+      const float &y_el = y_derivative.at<float>(i, j);
       const float x_el_f = static_cast<float>(x_el);
       const float y_el_f = static_cast<float>(y_el);
       //      std::cout << "derivs_x_el_f*: " << x_el_f << std::endl;
@@ -111,6 +119,8 @@ Eigen::Matrix2f ComputeG(const cv::Mat &x_derivative,
       xy_term += x_el_f * y_el_f;
     }
   }
+  //  std::cout << x_term << " " << xy_term << std::endl
+  //            << xy_term << " " << y_term << std::endl;
   G << x_term, xy_term, xy_term, y_term;
   return G;
 }
@@ -122,8 +132,8 @@ Eigen::Vector2f ComputeB(const cv::Mat &x_derivative,
   float y_term = 0;
   for (size_t i = 0; i < x_derivative.rows; ++i) {
     for (size_t j = 0; j < x_derivative.cols; ++j) {
-      const uchar &x_el = x_derivative.at<uchar>(i, j);
-      const uchar &y_el = y_derivative.at<uchar>(i, j);
+      const float &x_el = x_derivative.at<float>(i, j);
+      const float &y_el = y_derivative.at<float>(i, j);
       const uchar &t_el = t_derivative.at<uchar>(i, j);
       //      std::cout << "x_el: " << x_el << std::endl;
       //      std::cout << "y_el: " << y_el << std::endl;
@@ -137,10 +147,11 @@ Eigen::Vector2f ComputeB(const cv::Mat &x_derivative,
       y_term += y_el_f * t_el_f;
     }
   }
+  // std::cout << "Computed b-terms: " << x_term << " " << y_term << std::endl;
   return {x_term, y_term};
 }
 
-void CropRectSubpix(cv::Mat &src, const cv::Size &window_size,
+void CropRectSubpix(const cv::Mat &src, const cv::Size &window_size,
                     const cv::Point2f &center, cv::Mat &out) {
   //  std::cout << "coords: (" << center.x << " , " << center.y << ") "
   //            << "{" << src.cols << ", " << src.rows << "}" << std::endl;
@@ -150,6 +161,87 @@ void CropRectSubpix(cv::Mat &src, const cv::Size &window_size,
   assert(center.y >= 0);
   out.create(window_size, src.type());
   cv::getRectSubPix(src, window_size, center, out);
+  //  cv::imshow("cropped", out);
+  //  cv::waitKey(0);
+}
+
+cv::Mat TranslateImage(const cv::Mat &input_img, const float x, const float y) {
+  /* Build affine matrix of type:
+   * [ 1  0  x ]
+   * [ 0  1  y ]
+   */
+  cv::Mat out(input_img.size(), input_img.type());
+  cv::Mat affine(2, 3, CV_32FC1);
+  affine.at<float>(0, 0) = 1;
+  affine.at<float>(0, 1) = 0;
+  affine.at<float>(1, 0) = 0;
+  affine.at<float>(1, 1) = 1;
+  affine.at<float>(0, 2) = x;
+  affine.at<float>(1, 2) = y;
+  cv::warpAffine(input_img, out, affine, out.size());
+  return out;
+}
+
+std::vector<Eigen::Vector2f> TrackTest(const cv::Mat &prev,
+                                       const cv::Mat &current) {
+  std::cout << "Hi five, i am being called! " << std::endl;
+  const cv::Size kWindowSize{11, 11};
+  const float kMinimumShiftLength = 0.001;
+  const int kMaxCount = 155;
+  // Find good features to track
+  std::vector<cv::Point2f> points_to_track;
+  GoodFeaturesToTrack(prev, points_to_track);
+  std::cout << "Features found: " << points_to_track.size() << std::endl;
+
+  // Compute XY derivatives
+  cv::Mat prev_x_deriv;
+  cv::Mat prev_y_deriv;
+  ComputeXYImageDerivatives(prev, prev_x_deriv, prev_y_deriv);
+  std::cout << "XY derivatives computed." << std::endl;
+
+  // Compute deslocation in each tracked feature:
+  std::vector<Eigen::Vector2f> shifts;
+  shifts.reserve(points_to_track.size());
+  std::cout << "computing shifts!" << std::endl;
+  for (const auto &run_feature : points_to_track) {
+    // Crop windows
+    cv::Mat cropped_x_deriv;
+    cv::Mat cropped_y_deriv;
+    CropRectSubpix(prev_x_deriv, kWindowSize, run_feature, cropped_x_deriv);
+    CropRectSubpix(prev_y_deriv, kWindowSize, run_feature, cropped_y_deriv);
+    cv::Mat cropped_prev;
+    CropRectSubpix(prev, kWindowSize, run_feature, cropped_prev);
+    float shift_length = kMinimumShiftLength + 1;
+    int count = 0;
+    Eigen::Vector2f shift{0., 0.};
+    while (shift_length > kMinimumShiftLength && count < kMaxCount) {
+      cv::Mat cropped_curr;
+      cv::Point2f shift_cv{shift[0], shift[1]};
+      CropRectSubpix(current, kWindowSize, run_feature + shift_cv,
+                     cropped_curr);
+      cv::Mat cropped_time_deriv;
+      ComputeTimeDerivative(cropped_prev, cropped_curr, cropped_time_deriv);
+      // cv::subtract(cropped_curr, cropped_prev, cropped_time_deriv);
+      // Compute G and b
+      Eigen::Matrix2f G = ComputeG(cropped_x_deriv, cropped_y_deriv);
+      Eigen::Matrix2f G_inv = G.inverse();
+      Eigen::Vector2f b =
+          ComputeB(cropped_x_deriv, cropped_y_deriv, cropped_time_deriv);
+      // Compute shift d
+      Eigen::Vector2f d = (-G_inv * b);
+      shift_length = d.norm();
+      shift += d;
+      count++;
+    }
+    shifts.push_back(shift);
+  }
+  // Print shifts
+  std::cout << "******** Shifts ********" << std::endl;
+  for (const auto &run_shift : shifts) {
+    std::cout << "[" << run_shift[0] << ", " << run_shift[1] << "]"
+              << std::endl;
+  }
+  return shifts;
 }
 
 }  // namespace fail_3d

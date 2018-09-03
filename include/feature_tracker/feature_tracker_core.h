@@ -9,11 +9,12 @@
 namespace fail_3d {
 class FeatureTracker {
  public:
-  FeatureTracker(const size_t track_window_size = 15,
-                 const size_t feature_window_size = 7,
+  FeatureTracker(const size_t track_window_size = 17,
+                 const size_t feature_window_size = 17,
                  const size_t pyramid_size = 3);
   void Initialize(const cv::Mat& init_frame);
   void Track(const cv::Mat& next_frame);
+  void SetCurrentImage(const cv::Mat& current_image);
 
   std::vector<cv::Point2f> GetPositions();
 

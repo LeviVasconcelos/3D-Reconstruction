@@ -41,6 +41,10 @@ void ComputeXYImageDerivatives(const cv::Mat& src, cv::Mat& x_derivative,
 
 void ComputeTimeDerivative(const cv::Mat& t1, const cv::Mat& t2, cv::Mat& out);
 
-void CropRectSubpix(cv::Mat& src, const cv::Size& window,
+void CropRectSubpix(const cv::Mat& src, const cv::Size& window,
                     const cv::Point2f& center, cv::Mat& out);
+
+std::vector<Eigen::Vector2f> TrackTest(const cv::Mat& prev,
+                                       const cv::Mat& current);
+cv::Mat TranslateImage(const cv::Mat& input_img, const float x, const float y);
 }  // namespace fail_3d

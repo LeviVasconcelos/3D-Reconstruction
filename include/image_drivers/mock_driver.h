@@ -16,6 +16,7 @@ class MockImageDriver {
 
   bool LoadNextImage();
   cv::Mat& GetImage();
+  size_t GetTotalImages();
 
  private:
   void LoadImageFilePaths(const std::string& path_dir);
