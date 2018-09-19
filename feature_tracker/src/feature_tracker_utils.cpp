@@ -182,12 +182,61 @@ cv::Mat TranslateImage(const cv::Mat &input_img, const float x, const float y) {
   return out;
 }
 
-std::vector<Eigen::Vector2f> TrackTest(const cv::Mat &prev,
-                                       const cv::Mat &current) {
-  std::cout << "Hi five, i am being called! " << std::endl;
+std::vector<Eigen::Vector2f> TrackImages(
+    const cv::Mat &prev, const cv::Mat &current,
+    const std::vector<cv::Point2f> &points_to_track) {
   const cv::Size kWindowSize{11, 11};
   const float kMinimumShiftLength = 0.001;
   const int kMaxCount = 155;
+
+  // Compute XY derivatives
+  cv::Mat prev_x_deriv;
+  cv::Mat prev_y_deriv;
+  ComputeXYImageDerivatives(prev, prev_x_deriv, prev_y_deriv);
+
+  // Compute deslocation in each tracked feature:
+  std::vector<Eigen::Vector2f> shifts;
+  shifts.reserve(points_to_track.size());
+  for (const auto &run_feature : points_to_track) {
+    // Crop windows
+    cv::Mat cropped_x_deriv;
+    cv::Mat cropped_y_deriv;
+    CropRectSubpix(prev_x_deriv, kWindowSize, run_feature, cropped_x_deriv);
+    CropRectSubpix(prev_y_deriv, kWindowSize, run_feature, cropped_y_deriv);
+    cv::Mat cropped_prev;
+    CropRectSubpix(prev, kWindowSize, run_feature, cropped_prev);
+    float shift_length = kMinimumShiftLength + 1;
+    int count = 0;
+    Eigen::Vector2f shift{0., 0.};
+    while (shift_length > kMinimumShiftLength && count < kMaxCount) {
+      cv::Mat cropped_curr;
+      cv::Point2f shift_cv{shift[0], shift[1]};
+      CropRectSubpix(current, kWindowSize, run_feature + shift_cv,
+                     cropped_curr);
+      cv::Mat cropped_time_deriv;
+      ComputeTimeDerivative(cropped_prev, cropped_curr, cropped_time_deriv);
+      // Compute G and b
+      Eigen::Matrix2f G = ComputeG(cropped_x_deriv, cropped_y_deriv);
+      Eigen::Matrix2f G_inv = G.inverse();
+      Eigen::Vector2f b =
+          ComputeB(cropped_x_deriv, cropped_y_deriv, cropped_time_deriv);
+      // Compute shift d
+      Eigen::Vector2f d = (-G_inv * b);
+      shift_length = d.norm();
+      shift += d;
+      count++;
+    }
+    shifts.push_back(shift);
+  }
+  return shifts;
+}
+
+std::vector<Eigen::Vector2f> TrackTest(const cv::Mat &prev,
+                                       const cv::Mat &current) {
+  std::cout << "Hi five, i am being called! " << std::endl;
+  const cv::Size kWindowSize{13, 13};
+  const float kMinimumShiftLength = 0.01;
+  const int kMaxCount = 1000;
   // Find good features to track
   std::vector<cv::Point2f> points_to_track;
   GoodFeaturesToTrack(prev, points_to_track);

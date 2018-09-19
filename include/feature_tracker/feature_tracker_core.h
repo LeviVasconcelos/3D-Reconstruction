@@ -19,6 +19,9 @@ class FeatureTracker {
   std::vector<cv::Point2f> GetPositions();
 
  private:
+  std::vector<Eigen::Vector2f> TrackImages(
+      const cv::Mat& prev, const cv::Mat& current,
+      const std::vector<cv::Point2f>& points_to_track);
   void Reset();
   void ComputePyramidXYDerivatives();
   void ComputePyramidTimeDerivatives(const std::vector<cv::Mat>& target);
